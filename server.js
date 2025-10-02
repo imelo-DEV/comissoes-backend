@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -15,7 +14,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const DB_CONFIG = {
   host: 'localhost',
   user: 'root',
-  password: 'SUA_SENHA_AQUI', // <<< troque aqui
+  password: '211022', // <<< troque aqui
   database: 'concessionaria',
   waitForConnections: true,
   connectionLimit: 10,
@@ -23,6 +22,17 @@ const DB_CONFIG = {
 };
 
 const pool = mysql.createPool(DB_CONFIG);
+
+// Teste de conexão no startup (para debug)
+pool.getConnection()
+  .then((conn) => {
+    console.log('✅ Conexão com o banco de dados estabelecida!');
+    conn.release();
+  })
+  .catch((err) => {
+    console.error('❌ Erro na conexão com o banco de dados:', err.message);
+    process.exit(1);  // Para o servidor se der erro
+  });
 
 // Helper: recebe month 'YYYY-MM' opcional e retorna start/end (1 -> 30)
 function cycleRangeFromMonth(monthStr) {
@@ -90,20 +100,54 @@ app.get('/api/clients', async (req, res) => {
 });
 
 app.post('/api/payments', async (req, res) => {
+  console.log('📥 POST /api/payments - Dados recebidos:', req.body);
   const { client_id, amount, payment_date } = req.body;
-  if (!client_id || !amount) return res.status(400).json({ error: 'client_id e amount obrigatórios' });
-  const date = payment_date || (new Date()).toISOString().slice(0,10);
+  
+  if (!client_id || !amount) {
+    console.log('❌ Validação: client_id ou amount ausentes');
+    return res.status(400).json({ error: 'client_id e amount obrigatórios' });
+  }
+  
+  const clientIdNum = parseInt(client_id);
+  if (isNaN(clientIdNum) || clientIdNum <= 0) {
+    console.log('❌ client_id inválido:', client_id);
+    return res.status(400).json({ error: 'client_id deve ser um número inteiro positivo' });
+  }
+  
+  const amountNum = parseFloat(amount);
+  if (isNaN(amountNum) || amountNum <= 0) {
+    console.log('❌ amount inválido:', amount);
+    return res.status(400).json({ error: 'amount deve ser um número positivo' });
+  }
+  
+  const date = payment_date || new Date().toISOString().slice(0, 10);
+  console.log('📅 Data:', date, '| Client ID:', clientIdNum, '| Amount:', amountNum);
+  
+  let conn;
   try {
-    const conn = await pool.getConnection();
-    await conn.execute(
+    conn = await pool.getConnection();
+    console.log('🔗 Conexão OK');
+    
+    // Verificação crucial: client_id existe?
+    const [clientCheck] = await conn.execute('SELECT id, name FROM clients WHERE id = ?', [clientIdNum]);
+    if (clientCheck.length === 0) {
+      console.log('❌ client_id não existe:', clientIdNum);
+      return res.status(400).json({ error: `Cliente com ID ${clientIdNum} não encontrado. Clientes disponíveis: rode GET /api/clients` });
+    }
+    console.log('✅ Cliente OK:', clientCheck[0].name);
+    
+    const [result] = await conn.execute(
       'INSERT INTO payments (client_id, amount, payment_date) VALUES (?, ?, ?)',
-      [client_id, amount, date]
+      [clientIdNum, amountNum, date]
     );
-    conn.release();
-    res.json({ ok: true });
+    console.log('✅ INSERT sucesso! ID:', result.insertId);
+    res.json({ ok: true, id: result.insertId, message: 'Pagamento registrado!' });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erro ao registrar pagamento' });
+    console.error('💥 Erro no INSERT:', err.message);
+    console.error('Código:', err.code, '| SQL State:', err.sqlState);
+    res.status(500).json({ error: 'Erro ao registrar pagamento', details: err.message });
+  } finally {
+    if (conn) conn.release();
   }
 });
 

@@ -18,10 +18,3 @@ CREATE TABLE IF NOT EXISTS payments (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 );
-
--- seed example
-INSERT INTO clients (name, max_amount) VALUES ('Cliente A', 150.00), ('Cliente B', 150.00);
-INSERT INTO payments (client_id, amount, payment_date) VALUES
- (1, 50.00, CURDATE()),
- (1, 25.00, CURDATE()),
- (2, 100.00, CURDATE());
