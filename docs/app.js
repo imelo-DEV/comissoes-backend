@@ -1,9 +1,11 @@
+const API_BASE = "https://comissoes-backend.onrender.com";
+
 const api = {
-  clients: (m) => `/api/clients${m ? '?month='+m : ''}`,
-  totals: (m) => `/api/totals${m ? '?month='+m : ''}`,
-  addClient: '/api/clients',
-  addPayment: '/api/payments',
-  exportXml: (m) => `/api/export/xml${m ? '?month='+m : ''}`
+  clients: (m) => `${API_BASE}/api/clients${m ? '?month='+m : ''}`,
+  totals: (m) => `${API_BASE}/api/totals${m ? '?month='+m : ''}`,
+  addClient: `${API_BASE}/api/clients`,
+  addPayment: `${API_BASE}/api/payments`,
+  exportXml: (m) => `${API_BASE}/api/export/xml${m ? '?month='+m : ''}`
 };
 
 const $ = id => document.getElementById(id);
