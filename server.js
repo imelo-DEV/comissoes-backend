@@ -5,13 +5,12 @@ const { Pool } = require('pg');
 const { create } = require('xmlbuilder2');
 const path = require('path');
 
-
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Conexão com Postgres no Render
+// Conexão com Postgres no Render usando DATABASE_URL e SSL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
@@ -29,7 +28,12 @@ const pool = new Pool({
   }
 })();
 
-// Helper: recebe month 'YYYY-MM' opcional e retorna start/end (1 -> 30)
+// Rota raiz para teste
+app.get('/', (req, res) => {
+  res.send('🚀 Backend Comissões funcionando!');
+});
+
+// Helper: recebe month 'YYYY-MM' opcional e retorna start/end
 function cycleRangeFromMonth(monthStr) {
   const now = monthStr ? new Date(monthStr + '-01') : new Date();
   const year = now.getFullYear();
@@ -99,11 +103,8 @@ app.post('/api/payments', async (req, res) => {
 
   const date = payment_date || new Date().toISOString().slice(0, 10);
   try {
-    // Verifica se o cliente existe
     const check = await pool.query('SELECT id FROM clients WHERE id = $1', [client_id]);
-    if (check.rowCount === 0) {
-      return res.status(400).json({ error: `Cliente com ID ${client_id} não encontrado` });
-    }
+    if (check.rowCount === 0) return res.status(400).json({ error: `Cliente com ID ${client_id} não encontrado` });
 
     await pool.query(
       'INSERT INTO payments (client_id, amount, payment_date) VALUES ($1, $2, $3)',
